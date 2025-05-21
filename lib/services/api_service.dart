@@ -535,10 +535,9 @@ class ApiService {
           await setToken(token);
 
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('member_name', memberName ?? '');
+          await prefs.setString('name', memberName ?? ''); // Ganti dari 'member_name' ke 'name'
           await prefs.setString('member_id', memberId.toString());
-          await prefs.setString('avatar', user['avatar'] ?? '');
-
+          await prefs.setString('avatar', (user['avatar'] ?? '').toString());
           return {
             'success': true,
             'message': responseData['message'] ?? 'Login sukses',

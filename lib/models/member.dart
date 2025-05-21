@@ -2,11 +2,13 @@ class Member {
   final int id;
   final String name;
   final String email;
+  final String photoUrl;
 
   Member({
     required this.id,
     required this.name,
     required this.email,
+    required this.photoUrl
   });
 
   // Factory constructor untuk membuat objek Member dari JSON
@@ -15,6 +17,7 @@ class Member {
       id: json['id'] ?? 0,
       name: json['name'] ?? 'Tidak diketahui',
       email: json['email'] ?? 'Tidak tersedia',
+      photoUrl: json['photo_url'],
     );
   }
 
@@ -24,6 +27,7 @@ class Member {
       'id': id,
       'name': name,
       'email': email,
+      'photo_url': photoUrl,
     };
   }
 }

@@ -75,11 +75,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 children: [
                   CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.white,
+                    radius: MediaQuery.of(context).size.width * 0.15, // responsive
+                    backgroundColor: Colors.grey[200],
                     backgroundImage: (avatar.isNotEmpty)
                         ? NetworkImage('http://localhost:8000/storage/$avatar')
                         : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
+                    onBackgroundImageError: (_, __) {
+                      setState(() {
+                        avatar = '';
+                      });
+                    },
                   ),
                   const SizedBox(height: 12),
                   Text(

@@ -15,6 +15,7 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
   late Future<List<dynamic>> _recommendationFuture;
   late Future<Map<String, dynamic>> _statsFuture;
   String memberName = 'Member';
+  String? photoUrl;
 
   @override
   void initState() {
@@ -26,10 +27,12 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
 
   Future<void> _loadMemberName() async {
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('member_name');
-    if (name != null && name.isNotEmpty) {
+    final name = prefs.getString('name');
+    final photo = prefs.getString('avatar');
+    if (mounted) {
       setState(() {
-        memberName = name;
+        if (name != null && name.isNotEmpty) memberName = name;
+        if (photo != null && photo.isNotEmpty) photoUrl = photo;
       });
     }
   }
@@ -45,9 +48,14 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
           Row(
             children: [
               CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.indigo.withOpacity(0.1),
-                child: const Icon(Icons.person, size: 32, color: Colors.indigo),
+                radius: MediaQuery.of(context).size.width * 0.08,
+                backgroundColor: Colors.grey[200],
+                backgroundImage: (photoUrl != null && photoUrl!.isNotEmpty)
+                    ? NetworkImage('http://localhost:8000/storage/$photoUrl')
+                    : null,
+                child: (photoUrl == null || photoUrl!.isEmpty)
+                    ? const Icon(Icons.person, size: 32, color: Colors.indigo)
+                    : null,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -72,7 +80,6 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
               ),
             ],
           ),
-
           const SizedBox(height: 32),
 
           // Statistik Hari Ini

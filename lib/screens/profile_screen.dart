@@ -26,7 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       userName = prefs.getString('name') ?? 'Tidak diketahui';
-      photoUrl = prefs.getString('avatar'); // pastikan disimpan saat login
+      photoUrl = prefs.getString('avatar');
     });
   }
 
@@ -52,6 +52,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final imageProvider = (photoUrl != null && photoUrl!.isNotEmpty)
+        ? NetworkImage('http://localhost:8000/storage/members/$photoUrl')
+        : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Profil Saya')),
       body: ListView(
@@ -60,11 +64,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Center(
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundImage: (photoUrl != null && photoUrl!.isNotEmpty)
-                      ? NetworkImage('http://localhost:8000/storage/$photoUrl')
-                      : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: Image(
+                    image: imageProvider,
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.asset(
+                        'assets/images/profile_placeholder.png',
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
