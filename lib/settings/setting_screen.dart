@@ -81,10 +81,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? NetworkImage('http://localhost:8000/storage/$avatar')
                         : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
                     onBackgroundImageError: (_, __) {
-                      setState(() {
-                        avatar = '';
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          setState(() {
+                            avatar = '';
+                          });
+                        }
                       });
-                    },
+                    }, 
                   ),
                   const SizedBox(height: 12),
                   Text(

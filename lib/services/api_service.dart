@@ -619,6 +619,27 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> reportLostBook(int bookId, int memberId) async {
+    final url = Uri.parse('$baseUrl/bookMissing/$bookId');
+    final token = await getStoredToken(); // gunakan getStoredToken() yang sudah ada
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token', // jika perlu
+      },
+      body: jsonEncode({
+        'member_id': memberId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Gagal melaporkan buku hilang');
+    }
+  }
 
   Future<bool> logout() async {
     await _loadToken();

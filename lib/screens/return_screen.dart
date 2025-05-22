@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../settings/history_screen.dart';
+import '../settings/lost_report_screen.dart';
 
 class ReturnScreen extends StatefulWidget {
-  final int? loanId;
-
-  const ReturnScreen({super.key, this.loanId});
+  const ReturnScreen({super.key});
 
   @override
   State<ReturnScreen> createState() => _ReturnScreenState();
@@ -27,33 +25,16 @@ class _ReturnScreenState extends State<ReturnScreen> {
     });
   }
 
-  Future<void> _returnBook(int loanId) async {
-    setState(() {
-    });
-
-    try {
-      final result = await apiService.returnBook(loanId);
-      if (result['success'] == true) {
-        // ignore: use_build_context_synchronously
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Buku berhasil dikembalikan')),
-        );
-        Navigator.pushReplacement(
-          // ignore: use_build_context_synchronously
-          context,
-          MaterialPageRoute(builder: (_) => const HistoryScreen()),
-        );
-      } else {
-        throw Exception(result['message']);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Gagal mengembalikan buku: $e')),
-      );
-    } finally {
-      setState(() {
-      });
-    }
+  void _reportLostBook(int bookId, int memberId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LostReportScreen(
+          bookId: bookId,
+          memberId: memberId,
+        ),
+      ),
+    );
   }
 
   @override
@@ -75,9 +56,9 @@ class _ReturnScreenState extends State<ReturnScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Terjadi kesalahan: ${snapshot.error}'));
+            return Center(child: Text('❌ Terjadi kesalahan: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Tidak ada buku yang sedang dipinjam.'));
+            return const Center(child: Text('📭 Tidak ada buku yang sedang dipinjam.'));
           }
 
           final loans = snapshot.data!;
@@ -86,7 +67,8 @@ class _ReturnScreenState extends State<ReturnScreen> {
             itemCount: loans.length,
             itemBuilder: (context, index) {
               final loan = loans[index];
-              final loanId = loan['id'];
+              final bookId = loan['book_id'];
+              final memberId = loan['member_id'];
 
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -104,11 +86,19 @@ class _ReturnScreenState extends State<ReturnScreen> {
                     ],
                   ),
                   trailing: ElevatedButton.icon(
-                    onPressed: () => _returnBook(loanId),
-                    icon: const Icon(Icons.keyboard_return),
-                    label: const Text("Kembalikan"),
+                    onPressed: () {
+                      if (bookId != null && memberId != null) {
+                        _reportLostBook(bookId, memberId);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('⚠️ Data tidak lengkap')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.report_gmailerrorred),
+                    label: const Text("Buku Hilang"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: Colors.red,
                     ),
                   ),
                 ),

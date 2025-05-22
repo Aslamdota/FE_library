@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:library_frontend/screens/loan_list_screen.dart';
-import 'package:library_frontend/screens/member_list_screen.dart';
-import 'package:library_frontend/screens/return_screen.dart';
-import 'package:library_frontend/screens/pickup_screen.dart';
-import 'package:library_frontend/settings/setting_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/book_list_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/book_list_screen.dart';
+import 'screens/member_list_screen.dart';
+import 'screens/loan_list_screen.dart';
+import 'screens/return_screen.dart';
+import 'settings/setting_screen.dart';
 import 'settings/notification_screen.dart';
-import 'package:library_frontend/settings/history_screen.dart';
-
-
+import 'settings/history_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,21 +44,7 @@ class MyApp extends StatelessWidget {
         '/notifications': (context) => const NotificationScreen(),
         '/settings': (context) => const SettingsScreen(),
         '/history': (context) => const HistoryScreen(),
-      },
-      onGenerateRoute: (settings) {
-        // Navigasi dinamis untuk halaman yang butuh parameter
-        if (settings.name == '/returns') {
-          final args = settings.arguments as Map<String, dynamic>;
-          return MaterialPageRoute(
-            builder: (_) => ReturnScreen(loanId: args['loanId']),
-          );
-        } else if (settings.name == '/pickup') {
-          final args = settings.arguments as Map<String, dynamic>;
-          return MaterialPageRoute(
-            builder: (_) => PickupScreen(loanId: args['loanId']),
-          );
-        }
-        return null;
+        '/returns': (context) => const ReturnScreen(),
       },
     );
   }

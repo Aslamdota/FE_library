@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const ModernHomeContent(),
     const BookListScreen(),
     const LoanListScreen(),
-    const ReturnScreen(loanId: 0),
+    const ReturnScreen(),
     const ProfileScreen(),
   ];
 

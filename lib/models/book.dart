@@ -7,6 +7,7 @@ class Book {
   final int? publicationYear;
   final int? stock;
   final Map<String, dynamic>? category;
+  final String? coverUrl;
 
   Book({
     required this.id,
@@ -17,6 +18,7 @@ class Book {
     this.publicationYear,
     this.stock,
     this.category, required int year,
+    this.coverUrl,
   });
 
   factory Book.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,7 @@ class Book {
       stock: json['stock'],
       category: json['category'], 
       year: json['publication_year'] ?? 0,
+      coverUrl: json['cover'] ?? json['cover_url'],
     );
   }
 
