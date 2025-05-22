@@ -7,7 +7,7 @@ class Book {
   final int? publicationYear;
   final int? stock;
   final Map<String, dynamic>? category;
-  final String? coverUrl;
+  final String? coverPath;
 
   Book({
     required this.id,
@@ -18,20 +18,33 @@ class Book {
     this.publicationYear,
     this.stock,
     this.category,
-    this.coverUrl,
+    this.coverPath,
   });
 
-  factory Book.fromJson(Map<String, dynamic> json) {
+    factory Book.fromJson(Map<String, dynamic> json) {
+    int? parseInt(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+  
     return Book(
       id: json['id'],
       title: json['title'],
       author: json['author'],
       publisher: json['publisher'],
       isbn: json['isbn'],
-      publicationYear: json['publication_year'],
-      stock: json['stock'],
+      publicationYear: parseInt(json['publication_year']),
+      stock: parseInt(json['stock']),
       category: json['category'],
-      coverUrl: json['cover'] ?? json['cover_url'] ?? json['cover_image'],
+      coverPath: json['cover'] ?? json['cover_url'] ?? json['cover_image'],
     );
+  }
+
+  String? get coverUrl {
+    if (coverPath == null || coverPath!.isEmpty) return null;
+    final path = coverPath!.replaceFirst(RegExp(r'^/'), '');
+    return 'http://localhost:8000/storage/$path';
   }
 }
