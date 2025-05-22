@@ -101,7 +101,7 @@ class _BookListScreenState extends State<BookListScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                                            ClipRRect(
+                      ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: (book['cover'] ?? book['cover_image']) != null && (book['cover'] ?? book['cover_image']).toString().isNotEmpty
                             ? Image.network(
@@ -252,9 +252,9 @@ class _BookListScreenState extends State<BookListScreen> {
 
   Widget _buildBookCard(BuildContext context, dynamic book) {
   final theme = Theme.of(context);
-  final coverUrl = (book['cover'] ?? book['cover_image'])?.toString().replaceFirst(RegExp(r'^/'), '');
-  final imageUrl = coverUrl != null && coverUrl.isNotEmpty
-      ? 'http://localhost:8000/storage/$coverUrl'
+  final coverPath = (book['cover'] ?? book['cover_image'])?.toString().replaceFirst(RegExp(r'^/'), '');
+  final imageUrl = coverPath != null && coverPath.isNotEmpty
+      ? 'http://localhost:8000/storage/$coverPath'
       : null;
 
   return GestureDetector(

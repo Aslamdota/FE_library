@@ -206,11 +206,15 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
               elevation: 1.5,
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                // ...existing code...
                 leading: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: book['cover'] != null
                       ? Image.network(
-                          book['cover'],
+                          // Perbaiki agar konsisten:
+                          book['cover'].toString().startsWith('http')
+                              ? book['cover']
+                              : 'http://localhost:8000/storage/${book['cover'].toString().replaceFirst(RegExp(r'^/'), '')}',
                           width: 48,
                           height: 48,
                           fit: BoxFit.cover,
@@ -225,6 +229,7 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
                           child: const Icon(Icons.menu_book, color: Colors.indigo),
                         ),
                 ),
+                // ...existing code...
                 title: Text(
                   book['title'] ?? 'Tanpa Judul',
                   style: const TextStyle(fontWeight: FontWeight.w600),

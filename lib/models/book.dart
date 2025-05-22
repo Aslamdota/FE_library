@@ -17,7 +17,7 @@ class Book {
     this.isbn,
     this.publicationYear,
     this.stock,
-    this.category, required int year,
+    this.category,
     this.coverUrl,
   });
 
@@ -30,11 +30,8 @@ class Book {
       isbn: json['isbn'],
       publicationYear: json['publication_year'],
       stock: json['stock'],
-      category: json['category'], 
-      year: json['publication_year'] ?? 0,
-      coverUrl: json['cover'] ?? json['cover_url'],
+      category: json['category'],
+      coverUrl: json['cover'] ?? json['cover_url'] ?? json['cover_image'],
     );
   }
-
-  get year => null;
 }

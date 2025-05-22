@@ -14,7 +14,7 @@ void main() {
 
     // Data dummy buku
     final dummyBooks = [
-      Book(id: 1, title: 'Test Book', author: 'Test Author', year: 2024),
+      Book(id: 1, title: 'Test Book', author: 'Test Author', publicationYear: 2024),
     ];
 
     // Set behavior mock
@@ -70,7 +70,7 @@ class _BookListScreenTestableState extends State<BookListScreenTestable> {
             final book = snapshot.data!.first;
             return ListTile(
               title: Text(book.title),
-              subtitle: Text('${book.author} (${book.year})'),
+              subtitle: Text('${book.author} (${book.publicationYear})'),
             );
           }
         },
