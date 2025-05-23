@@ -29,7 +29,7 @@ class _BookListScreenState extends State<BookListScreen> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    _loadBooks();
+    _booksFuture = _fetchBooks();
     _loadMemberId();
   }
 
@@ -46,18 +46,24 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   Future<void> _loadBooks() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _booksFuture = _fetchBooks();
+    });
     try {
-      final future = widget.categoryId != null
-          ? _apiService.getBooksByCategory(widget.categoryId!)
-          : _apiService.getBooks();
-
-      _booksFuture = future.then((list) => list.map((e) => Book.fromJson(e)).toList());
+      await _booksFuture;
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<List<Book>> _fetchBooks() async {
+    final list = widget.categoryId != null
+        ? await _apiService.getBooksByCategory(widget.categoryId!)
+        : await _apiService.getBooks();
+    return list.map((e) => Book.fromJson(e)).toList();
   }
 
   Future<void> _loadMemberId() async {

@@ -6,6 +6,7 @@ class Book {
   final String? isbn;
   final int? publicationYear;
   final int? stock;
+  final String? description;
   final Map<String, dynamic>? category;
   final String? coverPath;
 
@@ -17,6 +18,7 @@ class Book {
     this.isbn,
     this.publicationYear,
     this.stock,
+    this.description,
     this.category,
     this.coverPath,
   });
