@@ -18,11 +18,12 @@ class BookListScreen extends StatefulWidget {
 }
 
 class _BookListScreenState extends State<BookListScreen> {
-  final ApiService apiService = ApiService();
+  final ApiService _apiService = ApiService();
   final TextEditingController _searchController = TextEditingController();
   late Future<List<Book>> _booksFuture;
   String? _memberId;
   String _searchQuery = '';
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -44,143 +45,290 @@ class _BookListScreenState extends State<BookListScreen> {
     });
   }
 
-  void _loadBooks() {
-    setState(() {
-      Future<List<dynamic>> future = widget.categoryId != null
-          ? apiService.getBooksByCategory(widget.categoryId!)
-          : apiService.getBooks();
+  Future<void> _loadBooks() async {
+    setState(() => _isLoading = true);
+    try {
+      final future = widget.categoryId != null
+          ? _apiService.getBooksByCategory(widget.categoryId!)
+          : _apiService.getBooks();
 
       _booksFuture = future.then((list) => list.map((e) => Book.fromJson(e)).toList());
-    });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _loadMemberId() async {
     final prefs = await SharedPreferences.getInstance();
-    final memberId = prefs.getString('member_id');
-    if (memberId != null) {
-      setState(() {
-        _memberId = memberId;
-      });
+    setState(() {
+      _memberId = prefs.getString('member_id');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Scaffold(
+      backgroundColor: colorScheme.background,
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(
+          widget.categoryName ?? 'Daftar Buku',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.primary,
+                colorScheme.primaryContainer,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(80),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: _buildSearchField(theme),
+          ),
+        ),
+      ),
+      body: _buildBookList(theme),
+    );
+  }
+
+  Widget _buildSearchField(ThemeData theme) {
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: 'Cari buku...',
+        prefixIcon: const Icon(Icons.search_rounded, size: 24),
+        filled: true,
+        fillColor: theme.cardColor,
+        contentPadding: const EdgeInsets.symmetric(vertical: 2),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: theme.colorScheme.primary,
+            width: 1.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookList(ThemeData theme) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
     }
+
+    return FutureBuilder<List<Book>>(
+      future: _booksFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildErrorState(snapshot.error.toString(), theme);
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyState(theme);
+        }
+
+        final filteredBooks = snapshot.data!.where(_matchesSearch).toList();
+
+        if (filteredBooks.isEmpty) {
+          return _buildNoResultsState(theme);
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: GridView.builder(
+            physics: const BouncingScrollPhysics(),
+            itemCount: filteredBooks.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 0.7,
+            ),
+            itemBuilder: (context, index) {
+              final book = filteredBooks[index];
+              return _BookCard(
+                book: book,
+                onTap: () => _showBookDetails(context, book),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorState(String error, ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 48,
+            color: theme.colorScheme.error,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Terjadi kesalahan',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              error,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadBooks,
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('Coba Lagi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.menu_book_rounded,
+            size: 64,
+            color: theme.colorScheme.primary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Tidak ada buku tersedia',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.categoryId != null
+                ? 'Tidak ada buku dalam kategori ini'
+                : 'Belum ada buku yang terdaftar',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadBooks,
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('Refresh'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoResultsState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 64,
+            color: theme.colorScheme.primary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Buku tidak ditemukan',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tidak ada hasil untuk "${_searchController.text}"',
+            style: theme.textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _matchesSearch(Book book) {
+    if (_searchQuery.isEmpty) return true;
+
+    final title = book.title.toLowerCase();
+    final author = book.author.toLowerCase();
+    final category = (book.category?['name'] ?? '').toString().toLowerCase();
+    final publisher = (book.publisher ?? '').toLowerCase();
+
+    return title.contains(_searchQuery) ||
+        author.contains(_searchQuery) ||
+        category.contains(_searchQuery) ||
+        publisher.contains(_searchQuery);
   }
 
   void _showBookDetails(BuildContext context, Book book) {
-    final theme = Theme.of(context);
-    final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: theme.cardColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24.0)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.65,
-          minChildSize: 0.45,
-          maxChildSize: 0.95,
-          builder: (context, scrollController) {
-            return SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 50,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: theme.dividerColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: book.coverUrl != null
-                            ? Image.network(
-                                book.coverUrl!,
-                                width: 80,
-                                height: 110,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
-                                  width: 80,
-                                  height: 110,
-                                  color: Colors.grey[300],
-                                  child: const Icon(Icons.broken_image, size: 40),
-                                ),
-                              )
-                            : Container(
-                                width: 80,
-                                height: 110,
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.menu_book, size: 40),
-                              ),
-                      ),
-                      const SizedBox(width: 18),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              book.title,
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: textColor,
-                              ),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              book.author,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Divider(color: theme.dividerColor),
-                  const SizedBox(height: 12),
-                  _infoRow('Penerbit', book.publisher, textColor),
-                  _infoRow('ISBN', book.isbn, textColor),
-                  _infoRow('Tahun Terbit', book.publicationYear?.toString(), textColor),
-                  _infoRow('Stok Tersedia', book.stock?.toString(), textColor),
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _handleBookLoan(context, book),
-                      icon: const Icon(Icons.shopping_cart_checkout),
-                      label: const Text('Pinjam Buku'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(fontSize: 16),
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.only(top: 12),
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.9,
+            builder: (context, scrollController) {
+              return _BookDetailsSheet(
+                book: book,
+                scrollController: scrollController,
+                memberId: _memberId,
+                onBorrow: () => _handleBookLoan(context, book),
+              );
+            },
+          ),
         );
       },
     );
@@ -195,7 +343,7 @@ class _BookListScreenState extends State<BookListScreen> {
         return;
       }
 
-      final response = await apiService.createLoan(_memberId!, book.id);
+      final response = await _apiService.createLoan(_memberId!, book.id);
 
       if (response['status'] == 'success') {
         _showSnackBar(context, 'Permintaan peminjaman berhasil dibuat');
@@ -219,120 +367,101 @@ class _BookListScreenState extends State<BookListScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
+}
 
-  Widget _infoRow(String label, String? value, Color textColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: TextStyle(fontWeight: FontWeight.bold, color: textColor),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value ?? '-',
-              style: TextStyle(color: textColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+class _BookCard extends StatelessWidget {
+  final Book book;
+  final VoidCallback onTap;
 
-  Widget _buildBookCard(BuildContext context, Book book) {
+  const _BookCard({
+    required this.book,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return GestureDetector(
-      onTap: () => _showBookDetails(context, book),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeInOut,
-        decoration: BoxDecoration(
-          color: theme.cardColor,
+      onTap: onTap,
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Gambar Buku
+            // Book Cover
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: book.coverUrl != null
-                  ? Image.network(
-                      book.coverUrl!,
-                      height: 140,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 140,
-                        color: Colors.grey[300],
-                        child: const Center(child: Icon(Icons.broken_image, size: 40)),
-                      ),
-                    )
-                  : Container(
-                      height: 140,
-                      width: double.infinity,
-                      color: Colors.grey[200],
-                      child: const Center(child: Icon(Icons.menu_book, size: 40)),
-                    ),
+              child: AspectRatio(
+                aspectRatio: 0.7,
+                child: book.coverUrl != null
+                    ? Image.network(
+                        book.coverUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _buildPlaceholderCover(),
+                      )
+                    : _buildPlaceholderCover(),
+              ),
             ),
 
-            // Konten Buku
+            // Book Info
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Judul
+                  // Title
                   Text(
                     book.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
 
-                  // Penulis
+                  // Author
                   Text(
                     book.author,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      color: theme.colorScheme.primary.withOpacity(0.8),
+                      color: colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
 
-                  // Stok
+                  // Stock
                   Row(
                     children: [
-                      Icon(Icons.inventory_2, size: 14, color: Colors.grey[500]),
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 14,
+                        color: colorScheme.primary,
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        'Stok: ${book.stock?.toString() ?? '0'}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        'Stok: ${book.stock ?? 0}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurface.withOpacity(0.6),
+                        ),
                       ),
                     ],
                   ),
@@ -345,101 +474,222 @@ class _BookListScreenState extends State<BookListScreen> {
     );
   }
 
-  bool _matchesSearch(Book book) {
-    if (_searchQuery.isEmpty) return true;
-
-    final title = (book.title).toLowerCase();
-    final author = (book.author).toLowerCase();
-    final category = (book.category?['name'] ?? '').toString().toLowerCase();
-    final publisher = (book.publisher ?? '').toLowerCase();
-
-    return title.contains(_searchQuery) ||
-        author.contains(_searchQuery) ||
-        category.contains(_searchQuery) ||
-        publisher.contains(_searchQuery);
+  Widget _buildPlaceholderCover() {
+    return Container(
+      color: Colors.grey[200],
+      child: const Center(
+        child: Icon(
+          Icons.menu_book_rounded,
+          size: 40,
+          color: Colors.grey,
+        ),
+      ),
+    );
   }
+}
+
+class _BookDetailsSheet extends StatelessWidget {
+  final Book book;
+  final ScrollController scrollController;
+  final String? memberId;
+  final VoidCallback onBorrow;
+
+  const _BookDetailsSheet({
+    required this.book,
+    required this.scrollController,
+    required this.memberId,
+    required this.onBorrow,
+  });
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final mediaQuery = MediaQuery.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: Colors.indigo,
-        title: Text(
-          widget.categoryName ?? 'Daftar Buku',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Cari buku...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: mediaQuery.size.height * 0.9,
+      ),
+      child: SingleChildScrollView(
+        controller: scrollController,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colorScheme.onSurface.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: 24),
+
+            // Book header
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Book cover - constrained to fixed size
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 100,
+                    maxHeight: 150,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      color: colorScheme.surfaceVariant,
+                      child: book.coverUrl != null
+                          ? Image.network(
+                              book.coverUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _buildPlaceholderCover(),
+                            )
+                          : _buildPlaceholderCover(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // Title and author - constrained to prevent overflow
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: mediaQuery.size.width - 180, // Account for padding and image
+                        ),
+                        child: Text(
+                          book.title,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        book.author,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colorScheme.primary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Divider
+            Divider(color: colorScheme.outline.withOpacity(0.2)),
+            const SizedBox(height: 16),
+
+            // Book details - constrained to prevent overflow
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: mediaQuery.size.width - 48, // Account for padding
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _DetailRow(label: 'Penerbit', value: book.publisher ?? '-'),
+                  _DetailRow(label: 'ISBN', value: book.isbn ?? '-'),
+                  _DetailRow(
+                    label: 'Tahun Terbit',
+                    value: book.publicationYear?.toString() ?? '-',
+                  ),
+                  _DetailRow(
+                    label: 'Stok Tersedia',
+                    value: book.stock?.toString() ?? '0',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Borrow button - fixed at bottom
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: memberId == null ? null : onBorrow,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                ),
+                child: memberId == null
+                    ? const Text('Login untuk Meminjam')
+                    : const Text('Pinjam Buku'),
+              ),
+            ),
+            
+            // Add extra padding at bottom for safety
+            SizedBox(height: mediaQuery.viewInsets.bottom),
+          ],
         ),
       ),
-      body: FutureBuilder<List<Book>>(
-        future: _booksFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 8),
-                  Text('Terjadi kesalahan:\n${snapshot.error}'),
-                ],
-              ),
-            );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.library_books, size: 48, color: Colors.grey),
-                  SizedBox(height: 8),
-                  Text('Tidak ada buku tersedia.', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            );
-          }
+    );
+  }
 
-          final filteredBooks = snapshot.data!.where(_matchesSearch).toList();
+  Widget _buildPlaceholderCover() {
+    return const Center(
+      child: Icon(
+        Icons.menu_book_rounded,
+        size: 40,
+        color: Colors.grey,
+      ),
+    );
+  }
+}
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: GridView.builder(
-              itemCount: filteredBooks.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 0.65,
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
               ),
-              itemBuilder: (context, index) {
-                final book = filteredBooks[index];
-                return _buildBookCard(context, book);
-              },
             ),
-          );
-        },
+          ),
+          Expanded(
+            child: Text(
+              value,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+          ),
+        ],
       ),
     );
   }
