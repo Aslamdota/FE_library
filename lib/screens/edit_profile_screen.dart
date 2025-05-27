@@ -1,10 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import '../services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EditProfileScreen extends StatefulWidget {
-  final int memberId;
+  final String memberId;
   final String name;
   final String phone;
   final String address;
@@ -22,13 +20,10 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
-  final TextEditingController _passwordController = TextEditingController();
-  File? _avatarFile;
-  bool _loading = false;
+  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -38,91 +33,149 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _addressController = TextEditingController(text: widget.address);
   }
 
-  Future<void> _pickAvatar() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        _avatarFile = File(picked.path);
-      });
-    }
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
   }
 
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
-
-    try {
-      final result = await ApiService().updateMember(
-        memberId: widget.memberId,
-        name: _nameController.text,
-        phone: _phoneController.text,
-        address: _addressController.text,
-        password: _passwordController.text.isNotEmpty ? _passwordController.text : null,
-        avatarPath: _avatarFile?.path,
-      );
+    if (_formKey.currentState!.validate()) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('member_id', widget.memberId);
+      await prefs.setString('name', _nameController.text);
+      await prefs.setString('phone', _phoneController.text);
+      await prefs.setString('address', _addressController.text);
+    
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Profil berhasil diupdate')),
-        );
-        Navigator.pop(context, true); // Kembali ke profil
+        Navigator.pop(context, true);
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal update: $e')),
-        );
-      }
-    } finally {
-      setState(() => _loading = false);
     }
+  }
+
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    TextInputType? keyboardType,
+    int? maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          floatingLabelBehavior: FloatingLabelBehavior.always,
+          labelStyle: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(
+              color: Color(0xFF4E54C8),
+              width: 2,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.grey[50],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profil')),
-      body: Padding(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text(
+          'Edit Profil',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: const Color(0xFF4E54C8),
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          TextButton(
+            onPressed: _saveProfile,
+            child: const Text(
+              'SIMPAN',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
-          child: ListView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: _pickAvatar,
-                child: CircleAvatar(
-                  radius: 48,
-                  backgroundImage: _avatarFile != null ? FileImage(_avatarFile!) : null,
-                  child: _avatarFile == null ? const Icon(Icons.camera_alt, size: 40) : null,
+              const Text(
+                'Informasi Pribadi',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4E54C8),
                 ),
               ),
-              const SizedBox(height: 20),
-              TextFormField(
+              const SizedBox(height: 16),
+              _buildTextField(
+                label: 'Nama Lengkap',
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Nama'),
-                validator: (v) => v == null || v.isEmpty ? 'Nama wajib diisi' : null,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Nama tidak boleh kosong';
+                  }
+                  return null;
+                },
               ),
-              TextFormField(
+              _buildTextField(
+                label: 'Nomor Telepon',
                 controller: _phoneController,
-                decoration: const InputDecoration(labelText: 'No. HP'),
-                validator: (v) => v == null || v.isEmpty ? 'No. HP wajib diisi' : null,
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Nomor telepon tidak boleh kosong';
+                  }
+                  return null;
+                },
               ),
-              TextFormField(
+              _buildTextField(
+                label: 'Alamat',
                 controller: _addressController,
-                decoration: const InputDecoration(labelText: 'Alamat'),
-                validator: (v) => v == null || v.isEmpty ? 'Alamat wajib diisi' : null,
-              ),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Password Baru (opsional)'),
-                obscureText: true,
+                maxLines: 3,
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loading ? null : _saveProfile,
-                child: _loading
-                    ? const CircularProgressIndicator()
-                    : const Text('Simpan Perubahan'),
-              ),
             ],
           ),
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../models/book.dart';
@@ -80,37 +81,51 @@ class _BookListScreenState extends State<BookListScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.background,
-      appBar: AppBar(
-        centerTitle: true,
-        title: Text(
-          widget.categoryName ?? 'Daftar Buku',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                colorScheme.primary,
-                colorScheme.primaryContainer,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              expandedHeight: 80,
+              floating: true,
+              pinned: true,
+              snap: false,
+              elevation: 0,
+              backgroundColor: colorScheme.primary,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Text(
+                  widget.categoryName ?? 'Daftar Buku',
+                  style: TextStyle(
+                    color: colorScheme.onPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                centerTitle: true,
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.primary,
+                        colorScheme.primaryContainer,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  child: _buildSearchField(theme),
+                ),
+              ),
             ),
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: _buildSearchField(theme),
-          ),
-        ),
+          ];
+        },
+        body: _buildBookList(theme),
       ),
-      body: _buildBookList(theme),
     );
   }
 
@@ -119,9 +134,14 @@ class _BookListScreenState extends State<BookListScreen> {
       controller: _searchController,
       decoration: InputDecoration(
         hintText: 'Cari buku...',
-        prefixIcon: const Icon(Icons.search_rounded, size: 24),
+        hintStyle: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.5)),
+        prefixIcon: Icon(
+          Icons.search_rounded,
+          size: 22,
+          color: theme.colorScheme.onSurface.withOpacity(0.7),
+        ),
         filled: true,
-        fillColor: theme.cardColor,
+        fillColor: theme.colorScheme.surface,
         contentPadding: const EdgeInsets.symmetric(vertical: 2),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -139,13 +159,15 @@ class _BookListScreenState extends State<BookListScreen> {
           ),
         ),
       ),
-    );
+    ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2);
   }
 
   Widget _buildBookList(ThemeData theme) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
+      return Center(
+        child: CircularProgressIndicator(
+          color: theme.colorScheme.primary,
+        ),
       );
     }
 
@@ -182,7 +204,7 @@ class _BookListScreenState extends State<BookListScreen> {
               return _BookCard(
                 book: book,
                 onTap: () => _showBookDetails(context, book),
-              );
+              ).animate().fadeIn(delay: (100 * index).ms);
             },
           ),
         );
@@ -220,6 +242,8 @@ class _BookListScreenState extends State<BookListScreen> {
           ElevatedButton(
             onPressed: _loadBooks,
             style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -258,6 +282,8 @@ class _BookListScreenState extends State<BookListScreen> {
           ElevatedButton(
             onPressed: _loadBooks,
             style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -317,7 +343,7 @@ class _BookListScreenState extends State<BookListScreen> {
       builder: (context) {
         return Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.background,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.only(top: 12),
@@ -337,7 +363,10 @@ class _BookListScreenState extends State<BookListScreen> {
           ),
         );
       },
-    );
+    ).then((_) {
+      // Trigger rebuild when sheet is closed
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _handleBookLoan(BuildContext context, Book book) async {
@@ -379,6 +408,12 @@ class _BookListScreenState extends State<BookListScreen> {
         ),
         margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 2),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Theme.of(context).colorScheme.onPrimary,
+          onPressed: () {},
+        ),
       ),
     );
   }
@@ -409,20 +444,22 @@ class _BookCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Book Cover
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: AspectRatio(
-                aspectRatio: 0.7,
-                child: book.coverUrl != null
-                    ? Image.network(
-                        book.coverUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildPlaceholderCover(),
-                      )
-                    : _buildPlaceholderCover(),
+            Hero(
+              tag: 'book-cover-${book.id}',
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: AspectRatio(
+                  aspectRatio: 1.0, // <--- Ubah dari 0.7 ke 1.0 agar cover lebih kecil
+                  child: book.coverUrl != null
+                      ? Image.network(
+                          book.coverUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildPlaceholderCover(colorScheme),
+                        )
+                      : _buildPlaceholderCover(colorScheme),
+                ),
               ),
             ),
-
             // Book Info
             Padding(
               padding: const EdgeInsets.all(12),
@@ -434,13 +471,13 @@ class _BookCard extends StatelessWidget {
                     book.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 10,
+                      color: colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 4),
-
+                  const SizedBox(height: 6),
                   // Author
                   Text(
                     book.author,
@@ -452,7 +489,6 @@ class _BookCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-
                   // Stock
                   Row(
                     children: [
@@ -476,18 +512,18 @@ class _BookCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
+      )
+    ); 
   }
 
-  Widget _buildPlaceholderCover() {
+  Widget _buildPlaceholderCover(ColorScheme colorScheme) {
     return Container(
-      color: Colors.grey[200],
-      child: const Center(
+      color: colorScheme.surfaceVariant,
+      child: Center(
         child: Icon(
           Icons.menu_book_rounded,
           size: 40,
-          color: Colors.grey,
+          color: colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -542,45 +578,44 @@ class _BookDetailsSheet extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Book cover - constrained to fixed size
-                ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: 100,
-                    maxHeight: 150,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      color: colorScheme.surfaceVariant,
-                      child: book.coverUrl != null
-                          ? Image.network(
-                              book.coverUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _buildPlaceholderCover(),
-                            )
-                          : _buildPlaceholderCover(),
+                // Book cover - Hero animation
+                Hero(
+                  tag: 'book-cover-${book.id}',
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 100,
+                      maxHeight: 150,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        color: colorScheme.surfaceVariant,
+                        child: book.coverUrl != null
+                            ? Image.network(
+                                book.coverUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _buildPlaceholderCover(colorScheme),
+                              )
+                            : _buildPlaceholderCover(colorScheme),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 16),
 
-                // Title and author - constrained to prevent overflow
+                // Title and author
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: mediaQuery.size.width - 180, // Account for padding and image
+                      Text(
+                        book.title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
                         ),
-                        child: Text(
-                          book.title,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -602,30 +637,32 @@ class _BookDetailsSheet extends StatelessWidget {
             Divider(color: colorScheme.outline.withOpacity(0.2)),
             const SizedBox(height: 16),
 
-            // Book details - constrained to prevent overflow
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: mediaQuery.size.width - 48, // Account for padding
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _DetailRow(label: 'Penerbit', value: book.publisher ?? '-'),
-                  _DetailRow(label: 'ISBN', value: book.isbn ?? '-'),
-                  _DetailRow(
-                    label: 'Tahun Terbit',
-                    value: book.publicationYear?.toString() ?? '-',
-                  ),
-                  _DetailRow(
-                    label: 'Stok Tersedia',
-                    value: book.stock?.toString() ?? '0',
-                  ),
-                ],
-              ),
+            // Book details
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _DetailRow(label: 'Penerbit', value: book.publisher ?? '-', colorScheme: colorScheme),
+                _DetailRow(label: 'ISBN', value: book.isbn ?? '-', colorScheme: colorScheme),
+                _DetailRow(
+                  label: 'Tahun Terbit',
+                  value: book.publicationYear?.toString() ?? '-',
+                  colorScheme: colorScheme,
+                ),
+                _DetailRow(
+                  label: 'Kategori',
+                  value: book.category?['name']?.toString() ?? '-',
+                  colorScheme: colorScheme,
+                ),
+                _DetailRow(
+                  label: 'Stok Tersedia',
+                  value: book.stock?.toString() ?? '0',
+                  colorScheme: colorScheme,
+                ),
+              ],
             ),
             const SizedBox(height: 32),
 
-            // Borrow button - fixed at bottom
+            // Borrow button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -637,6 +674,7 @@ class _BookDetailsSheet extends StatelessWidget {
                   ),
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
+                  elevation: 2,
                 ),
                 child: memberId == null
                     ? const Text('Login untuk Meminjam')
@@ -644,7 +682,7 @@ class _BookDetailsSheet extends StatelessWidget {
               ),
             ),
             
-            // Add extra padding at bottom for safety
+            // Extra padding for bottom inset
             SizedBox(height: mediaQuery.viewInsets.bottom),
           ],
         ),
@@ -652,12 +690,12 @@ class _BookDetailsSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholderCover() {
-    return const Center(
+  Widget _buildPlaceholderCover(ColorScheme colorScheme) {
+    return Center(
       child: Icon(
         Icons.menu_book_rounded,
         size: 40,
-        color: Colors.grey,
+        color: colorScheme.onSurfaceVariant,
       ),
     );
   }
@@ -666,10 +704,12 @@ class _BookDetailsSheet extends StatelessWidget {
 class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
+  final ColorScheme colorScheme;
 
   const _DetailRow({
     required this.label,
     required this.value,
+    required this.colorScheme,
   });
 
   @override
@@ -683,14 +723,18 @@ class _DetailRow extends StatelessWidget {
             width: 120,
             child: Text(
               '$label:',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
+              style: TextStyle(
+                color: colorScheme.onSurface.withOpacity(0.8),
+              ),
               overflow: TextOverflow.ellipsis,
               maxLines: 2,
             ),
