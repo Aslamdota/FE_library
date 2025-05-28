@@ -106,7 +106,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   final item = history[index];
                   final rawDate = item['return_date'];
                   String returnDate = '-';
-                  if (rawDate != null) {
+                  if (rawDate != null && rawDate.toString().isNotEmpty) {
                     try {
                       final date = DateTime.parse(rawDate);
                       returnDate = DateFormat('dd MMMM yyyy', 'id_ID').format(date);
@@ -114,6 +114,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       returnDate = rawDate.toString();
                     }
                   }
+                  final memberId = item['member_id']?.toString() ?? '-';
                   return AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: Card(
@@ -128,12 +129,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           item['book_title'] ?? 'Judul tidak tersedia',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        subtitle: Text('Tanggal dikembalikan: $returnDate'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Tanggal dikembalikan: $returnDate'),
+                            Text('Member ID: $memberId'),
+                          ],
+                        ),
                       ),
                     ),
                   );
                 },
-              );
+              );  
             },
           ),
         ),

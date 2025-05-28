@@ -603,15 +603,23 @@ class ApiService {
     }
   }
 
-  Future<bool> deleteHistory() async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/clearReturned'), // Endpoint Laravel
+    Future<bool> deleteHistory() async {
+    await _loadToken();
+    final url = Uri.parse('$baseUrl/clearReturned');
+    final token = await getStoredToken();
+    final prefs = await SharedPreferences.getInstance();
+    final memberId = prefs.getString('member_id');
+    
+    final response = await http.post(
+      url,
       headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token', 
       },
+      body: jsonEncode({
+        'member_id': memberId,
+      }),
     );
-
     if (response.statusCode == 200) {
       return true;
     } else {
