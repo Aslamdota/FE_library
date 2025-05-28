@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'package:intl/intl.dart';
 
 class HistoryScreen extends StatefulWidget {
+  static const routeName = '/history';
+
   const HistoryScreen({super.key});
 
   @override
@@ -19,8 +22,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _loadHistory() {
-    // Ganti dengan fungsi Anda untuk mengambil riwayat
     _historyFuture = apiService.getReturnedLoans();
+  }
+
+  Future<void> _refreshHistory() async {
+    setState(() {
+      _loadHistory();
+    });
   }
 
   Future<void> _deleteHistory() async {
@@ -36,7 +44,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
+            child: const Text(
+              'Hapus',
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -48,12 +59,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         setState(() {
           _historyFuture = Future.value([]);
         });
-        // ignore: use_build_context_synchronously
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Riwayat berhasil dihapus')),
         );
       } else {
-        // ignore: use_build_context_synchronously
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Gagal menghapus riwayat')),
         );
@@ -68,34 +79,64 @@ class _HistoryScreenState extends State<HistoryScreen> {
         title: const Text('Riwayat Pengembalian'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete_forever),
-            onPressed: _deleteHistory,
+            icon: const Icon(Icons.delete_forever_rounded, color: Colors.red),
             tooltip: 'Hapus Semua Riwayat',
+            onPressed: _deleteHistory,
           ),
         ],
       ),
-      body: FutureBuilder<List<dynamic>>(
-        future: _historyFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return const Center(child: Text('Gagal memuat riwayat'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Tidak ada riwayat pengembalian.'));
-          }
-          final history = snapshot.data!;
-          return ListView.builder(
-            itemCount: history.length,
-            itemBuilder: (context, index) {
-              final item = history[index];
-              return ListTile(
-                title: Text(item['book_title'] ?? '-'),
-                subtitle: Text('Tanggal: ${item['return_date'] ?? '-'}'),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _refreshHistory,
+          child: FutureBuilder<List<dynamic>>(
+            future: _historyFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return const Center(child: Text('Gagal memuat riwayat'));
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(child: Text('Tidak ada riwayat pengembalian.'));
+              }
+              final history = snapshot.data!;
+              return ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: history.length,
+                itemBuilder: (context, index) {
+                  final item = history[index];
+                  final rawDate = item['return_date'];
+                  String returnDate = '-';
+                  if (rawDate != null) {
+                    try {
+                      final date = DateTime.parse(rawDate);
+                      returnDate = DateFormat('dd MMMM yyyy', 'id_ID').format(date);
+                    } catch (_) {
+                      returnDate = rawDate.toString();
+                    }
+                  }
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Card(
+                      key: ValueKey(item['id'] ?? index),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                      child: ListTile(
+                        leading: const Icon(Icons.book_outlined, color: Colors.blue),
+                        title: Text(
+                          item['book_title'] ?? 'Judul tidak tersedia',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text('Tanggal dikembalikan: $returnDate'),
+                      ),
+                    ),
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+        ),
       ),
     );
   }
