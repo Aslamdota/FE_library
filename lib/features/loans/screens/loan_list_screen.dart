@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:library_frontend/models/book.dart';
+import '../../../services/api_service.dart';
 
 class LoanListScreen extends StatefulWidget {
   const LoanListScreen({super.key});
@@ -90,12 +91,52 @@ class _LoanListScreenState extends State<LoanListScreen> {
         separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final loan = loans[index];
+          // Buat objek Book dari data loan
+          final book = Book(
+            id: loan['book_id'] ?? 0,
+            title: loan['book_title'] ?? '',
+            author: loan['book_author'] ?? '',
+            coverPath: loan['cover_url'],
+          );
           return _LoanCard(
+            book: book,
             loan: loan,
-            onTap: () => _showLoanDetails(context, loan),
+            onTap: () => _showLoanDetails(context, loan, book),
           );
         },
       ),
+    );
+  }
+
+  void _showLoanDetails(BuildContext context, dynamic loan, Book book) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.background,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.9,
+              builder: (context, scrollController) {
+                return _LoanDetailsSheet(
+                  loan: loan,
+                  book: book,
+                  scrollController: scrollController,
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -174,44 +215,15 @@ class _LoanListScreenState extends State<LoanListScreen> {
       ),
     );
   }
-
-  void _showLoanDetails(BuildContext context, dynamic loan) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.background,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.7,
-              minChildSize: 0.5,
-              maxChildSize: 0.9,
-              builder: (context, scrollController) {
-                return _LoanDetailsSheet(
-                  loan: loan,
-                  scrollController: scrollController,
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
 class _LoanCard extends StatelessWidget {
+  final Book book;
   final dynamic loan;
   final VoidCallback onTap;
 
   const _LoanCard({
+    required this.book,
     required this.loan,
     required this.onTap,
   });
@@ -221,10 +233,6 @@ class _LoanCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-
-    // Get cover URL from multiple possible fields
-    final coverPath = loan['book_cover'] ?? loan['cover'] ?? loan['cover_url'];
-    final coverUrl = _getCoverUrl(coverPath);
 
     // Status styling
     final statusInfo = _getStatusInfo(loan['status'], isDark);
@@ -242,41 +250,27 @@ class _LoanCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Book Cover
-              Container(
-                width: 80,
-                height: 120,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: colorScheme.surfaceVariant,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+              // Book Cover with Hero animation - matching book list style
+              Hero(
+                tag: 'book-cover-${book.id}',
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 100,
+                    maxHeight: 150,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      color: colorScheme.surfaceVariant,
+                      child: book.coverUrl != null
+                          ? Image.network(
+                              book.coverUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _buildPlaceholderCover(colorScheme),
+                            )
+                          : _buildPlaceholderCover(colorScheme),
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: coverUrl != null
-                      ? Image.network(
-                          coverUrl,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            );
-                          },
-                          errorBuilder: (_, __, ___) => _buildPlaceholderCover(),
-                        )
-                      : _buildPlaceholderCover(),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -468,24 +462,17 @@ class _LoanCard extends StatelessWidget {
     }
   }
 
-  Widget _buildPlaceholderCover() {
-    return Center(
-      child: Icon(
-        Icons.menu_book_rounded,
-        size: 40,
-        color: Colors.grey[400],
+  Widget _buildPlaceholderCover(ColorScheme colorScheme) {
+    return Container(
+      color: colorScheme.surfaceVariant,
+      child: Center(
+        child: Icon(
+          Icons.menu_book_rounded,
+          size: 40,
+          color: colorScheme.onSurfaceVariant,
+        ),
       ),
     );
-  }
-
-  String? _getCoverUrl(dynamic coverPath) {
-    if (coverPath == null || coverPath.toString().isEmpty) return null;
-    
-    final path = coverPath.toString();
-    if (path.startsWith('http')) return path;
-    
-    // Handle local paths - adjust according to your API
-    return 'http://localhost:8000/storage/${path.replaceFirst(RegExp(r'^/'), '')}';
   }
 
   _StatusInfo _getStatusInfo(String status, bool isDark) {
@@ -499,8 +486,7 @@ class _LoanCard extends StatelessWidget {
       case 'Returned':
         return _StatusInfo(Colors.grey, 'Dikembalikan');
       default:
-        return _StatusInfo(
-            isDark ? Colors.white70 : Colors.black54, status);
+        return _StatusInfo(isDark ? Colors.white70 : Colors.black54, status);
     }
   }
 }
@@ -514,144 +500,172 @@ class _StatusInfo {
 
 class _LoanDetailsSheet extends StatelessWidget {
   final dynamic loan;
+  final Book book;
   final ScrollController scrollController;
 
   const _LoanDetailsSheet({
     required this.loan,
+    required this.book,
     required this.scrollController,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final mediaQuery = MediaQuery.of(context);
 
-    // Get cover URL
-    final coverPath = loan['book_cover'] ?? loan['cover'] ?? loan['cover_url'];
-    final coverUrl = _getCoverUrl(coverPath);
-
-    return Container(
+    return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: mediaQuery.size.height * 0.9,
       ),
-      child: Column(
-        children: [
-          // Drag handle
-          Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 16),
-            child: Center(
+      child: SingleChildScrollView(
+        controller: scrollController,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
               child: Container(
-                width: 60,
-                height: 5,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: theme.dividerColor.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(4),
+                  color: colorScheme.onSurface.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: 24),
 
-          // Content
-          Expanded(
-            child: SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Book Cover
-                  Center(
-                    child: Container(
-                      width: 150,
-                      height: 220,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: coverUrl != null
+            // Book header
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Book cover - Hero animation
+                Hero(
+                  tag: 'book-cover-${book.id}',
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 100,
+                      maxHeight: 150,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        color: colorScheme.surfaceVariant,
+                        child: book.coverUrl != null
                             ? Image.network(
-                                coverUrl,
+                                book.coverUrl!,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    _buildPlaceholderCover(),
+                                errorBuilder: (_, __, ___) => _buildPlaceholderCover(colorScheme),
                               )
-                            : _buildPlaceholderCover(),
+                            : _buildPlaceholderCover(colorScheme),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
+                const SizedBox(width: 16),
 
-                  // Book Title
-                  Text(
-                    loan['book_title'] ?? 'Judul tidak tersedia',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
+                // Title and author
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        book.title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        book.author,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colorScheme.primary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
 
-                  // Author
-                  Text(
-                    loan['book_author'] ?? 'Penulis tidak tersedia',
-                    style: theme.textTheme.titleMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
+            // Divider
+            Divider(color: colorScheme.outline.withOpacity(0.2)),
+            const SizedBox(height: 24),
 
-                  // Divider
-                  Divider(color: theme.dividerColor.withOpacity(0.2)),
-                  const SizedBox(height: 16),
+            // Book Title
+            Text(
+              loan['book_title'] ?? 'Judul tidak tersedia',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
 
-                  // Loan Details
-                  _DetailItem(
-                    icon: Icons.calendar_today,
-                    label: 'Tanggal Pinjam',
-                    value: loan['loan_date'] ?? '-',
-                  ),
-                  _DetailItem(
-                    icon: Icons.timer,
-                    label: 'Jatuh Tempo',
-                    value: loan['due_date'] ?? '-',
-                  ),
-                  if (loan['return_date'] != null)
+            // Author
+            Text(
+              loan['book_author'] ?? 'Penulis tidak tersedia',
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+
+            // Divider
+            Divider(color: theme.dividerColor.withOpacity(0.2)),
+            const SizedBox(height: 16),
+
+            // Loan Details
+            _DetailItem(
+              icon: Icons.calendar_today,
+              label: 'Tanggal Pinjam',
+              value: loan['loan_date'] ?? '-',
+            ),
+            _DetailItem(
+              icon: Icons.timer,
+              label: 'Jatuh Tempo',
+              value: loan['due_date'] ?? '-',
+            ),
+            ...(loan['return_date'] != null
+                ? [
                     _DetailItem(
                       icon: Icons.check_circle,
                       label: 'Tanggal Kembali',
                       value: loan['return_date']!,
                       isSuccess: true,
                     ),
-                  _DetailItem(
-                    icon: Icons.info,
-                    label: 'Status',
-                    value: loan['status'] ?? '-',
-                    isStatus: true,
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
+                  ]
+                : []),
+            _DetailItem(
+              icon: Icons.info,
+              label: 'Status',
+              value: loan['status'] ?? '-',
+              isStatus: true,
             ),
-          ),
+            const SizedBox(height: 24),
 
-          // Bottom Button
-          Padding(
-            padding: EdgeInsets.only(
-              bottom: 24 + mediaQuery.viewInsets.bottom,
-              left: 24,
-              right: 24,
-              top: 12,
+            // Bottom Button
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: 24 + mediaQuery.viewInsets.bottom,
+                left: 0,
+                right: 0,
+                top: 12,
+              ),
+              child: _buildActionButton(context),
             ),
-            child: _buildActionButton(context),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -702,9 +716,9 @@ class _LoanDetailsSheet extends StatelessWidget {
     }
   }
 
-  Widget _buildPlaceholderCover() {
+  Widget _buildPlaceholderCover(ColorScheme colorScheme) {
     return Container(
-      color: Colors.grey[200],
+      color: colorScheme.surfaceVariant,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -712,21 +726,19 @@ class _LoanDetailsSheet extends StatelessWidget {
             Icon(
               Icons.menu_book_rounded,
               size: 48,
-              color: Colors.grey[400],
+              color: colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 8),
-            const Text('No Cover'),
+            Text(
+              'No Cover',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  String? _getCoverUrl(dynamic coverPath) {
-    if (coverPath == null || coverPath.toString().isEmpty) return null;
-    final path = coverPath.toString();
-    if (path.startsWith('http')) return path;
-    return 'http://localhost:8000/storage/${path.replaceFirst(RegExp(r'^/'), '')}';
   }
 }
 

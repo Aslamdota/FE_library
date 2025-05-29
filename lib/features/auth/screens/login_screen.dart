@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart';
+// import 'package:flutter/gestures.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:library_frontend/services/api_service.dart';
-import 'package:library_frontend/screens/forgot_password_screen.dart';
-import 'package:library_frontend/screens/home_screen.dart';
-import 'package:library_frontend/screens/register_screen.dart';
+import 'package:library_frontend/features/auth/screens/forgot_password_screen.dart';
+import 'package:library_frontend/features/home/screens/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -108,6 +107,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           await prefs.setString('email', email);
           await prefs.setString('name', user['name']);
           await prefs.setString('phone', user['phone'] ?? '');
+          await prefs.setString('address', user['address'] ?? ''); 
           await prefs.setString('photo_url', user['photo_url'] ?? '');
 
           if (mounted) {
@@ -254,6 +254,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
+                                color: Colors.indigo,
                               ),
                             ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
 
@@ -300,11 +301,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       ),
 
                       const SizedBox(height: 24),
-
-                      _buildRegisterLink(theme)
-                          .animate()
-                          .fadeIn(delay: 800.ms)
-                          .slideY(begin: 0.2),
                     ],
                   ),
                 ),
@@ -441,33 +437,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           color: Colors.grey.shade600,
           fontWeight: FontWeight.w500,
         ),
-      ),
-    );
-  }
-
-  Widget _buildRegisterLink(ThemeData theme) {
-    return RichText(
-      text: TextSpan(
-        text: 'Don\'t have an account? ',
-        style: TextStyle(color: Colors.grey.shade600),
-        children: [
-          TextSpan(
-            text: 'Sign Up',
-            style: TextStyle(
-              color: theme.primaryColor,
-              fontWeight: FontWeight.bold,
-            ),
-            recognizer: TapGestureRecognizer()
-              ..onTap = () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RegisterScreen(),
-                  ),
-                );
-              },
-          ),
-        ],
       ),
     );
   }

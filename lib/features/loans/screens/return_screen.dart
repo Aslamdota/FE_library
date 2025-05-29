@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import '../settings/lost_report_screen.dart';
+import '../../../services/api_service.dart';
+import 'lost_report_screen.dart';
 
 class ReturnScreen extends StatefulWidget {
   const ReturnScreen({super.key});

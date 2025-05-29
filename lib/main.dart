@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/book_list_screen.dart';
-import 'screens/member_list_screen.dart';
-import 'screens/loan_list_screen.dart';
-import 'screens/return_screen.dart';
-import 'settings/setting_screen.dart';
-import 'settings/notification_screen.dart';
-import 'settings/history_screen.dart';
+import 'features/home/screens/home_screen.dart';
+import 'features/auth/screens/login_screen.dart';
+import 'features/books/screens/book_list_screen.dart';
+import 'features/members/screens/member_list_screen.dart';
+import 'features/loans/screens/loan_list_screen.dart';
+import 'features/loans/screens/return_screen.dart';
+import 'features/settings/screens/setting_screen.dart';
+import 'features/settings/screens/notification_screen.dart';
+import 'features/settings/screens/history_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

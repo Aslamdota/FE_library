@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../settings/setting_screen.dart';
-import '../settings/notification_screen.dart';
-import '../settings/denda_screen.dart';
-import '../settings/history_screen.dart';
+import '../../settings/screens/setting_screen.dart';
+import '../../settings/screens/notification_screen.dart';
+import '../../loans/screens/denda_screen.dart';
+import '../../settings/screens/history_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

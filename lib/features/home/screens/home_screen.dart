@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'book_list_screen.dart';
-import 'loan_list_screen.dart';
-import 'return_screen.dart';
-import 'profile_screen.dart';
-import '../settings/notification_screen.dart';
-import '../widgets/home_content.dart';
-import '../services/api_service.dart';
+import '../../books/screens/book_list_screen.dart';
+import '../../loans/screens/loan_list_screen.dart';
+import '../../loans/screens/return_screen.dart';
+import '../../auth/screens/profile_screen.dart';
+import '../../settings/screens/notification_screen.dart';
+import '../../../widgets/home_content.dart';
+import '../../../services/api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
