@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:library_frontend/models/member.dart'; // Import your Member model
 import '../../auth/screens/edit_profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -10,26 +11,31 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String name = 'Memuat...';
-  String email = 'Memuat...';
-  String phone = 'Memuat...';
-  String address = 'Memuat...';
-  String avatar = '';
+  Member? _member;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadSettingsData();
+    _loadMemberData();
   }
 
-  Future<void> _loadSettingsData() async {
+  Future<void> _loadMemberData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      name = prefs.getString('name') ?? 'Tidak diketahui';
-      email = prefs.getString('email') ?? 'Tidak diketahui';
-      phone = prefs.getString('phone') ?? 'Tidak diketahui';
-      address = prefs.getString('address') ?? 'Belum tersedia';
-      avatar = prefs.getString('avatar') ?? '';
+      _member = Member(
+        id: int.tryParse(prefs.getString('member_id') ?? '0') ?? 0,
+        name: prefs.getString('name') ?? 'Tidak diketahui',
+        memberId: prefs.getString('member_id') ?? '',
+        email: prefs.getString('email') ?? 'Tidak diketahui',
+        phone: prefs.getString('phone') ?? 'Tidak diketahui',
+        address: prefs.getString('address') ?? 'Belum tersedia',
+        password: null,
+        avatar: prefs.getString('avatar') ?? '',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      _isLoading = false;
     });
   }
 
@@ -84,30 +90,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _navigateToEditProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final memberId = prefs.getString('member_id') ?? '';
-    final currentName = prefs.getString('name') ?? '';
-    final currentPhone = prefs.getString('phone') ?? '';
-    final currentAddress = prefs.getString('address') ?? '';
-  
+    if (_member == null) return;
+    
     final updated = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => EditProfileScreen(
-          memberId: memberId,
-          name: currentName,
-          phone: currentPhone,
-          address: currentAddress,
+          member: _member!, // Pass the entire member object
         ),
       ),
     );
+    
     if (updated == true) {
-      _loadSettingsData();
+      await _loadMemberData();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_member == null) {
+      return const Scaffold(
+        body: Center(child: Text('Gagal memuat data profil')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FD),
       appBar: AppBar(
@@ -167,9 +179,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         child: ClipOval(
-                          child: (avatar.isNotEmpty)
+                          child: (_member!.avatar.isNotEmpty)
                               ? Image.network(
-                                  'http://localhost:8000/storage/$avatar',
+                                  'http://localhost:8000/storage/${_member!.avatar}',
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Image.asset(
@@ -200,7 +212,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    name,
+                    _member!.name,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -209,7 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    email,
+                    _member!.email,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -238,9 +250,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                  _buildInfoTile(icon: Icons.email, title: 'Email', subtitle: email),
-                  _buildInfoTile(icon: Icons.phone, title: 'Telepon', subtitle: phone),
-                  _buildInfoTile(icon: Icons.home, title: 'Alamat', subtitle: address),
+                  _buildInfoTile(
+                    icon: Icons.email, 
+                    title: 'Email', 
+                    subtitle: _member!.email
+                  ),
+                  _buildInfoTile(
+                    icon: Icons.phone, 
+                    title: 'Telepon', 
+                    subtitle: _member!.phone
+                  ),
+                  _buildInfoTile(
+                    icon: Icons.home, 
+                    title: 'Alamat', 
+                    subtitle: _member!.address
+                  ),
                 ],
               ),
             ),

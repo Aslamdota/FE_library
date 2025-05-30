@@ -1,19 +1,25 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/member.dart';
+
+// Custom exception for API errors
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  final dynamic errors;
+
+  ApiException({required this.message, this.statusCode, this.errors});
+
+  @override
+  String toString() => 'ApiException: $message (Status: $statusCode, Errors: $errors)';
+}
 
 class ApiService {
   final String baseUrl = 'http://127.0.0.1:8000/api';
   String? token;
-
-  ApiService() {
-    _init();
-  }
-
-  Future<void> _init() async {
-    await _loadToken();
-  }
 
   Future<void> _loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -30,23 +36,15 @@ class ApiService {
     token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
-    await prefs.remove('member_name');
-  }
-
-  Future<String?> getStoredToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
-  }
-
-  Future<String?> getStoredMemberName() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('member_name');
+    await prefs.remove('name');
+    await prefs.remove('member_id');
+    await prefs.remove('avatar');
   }
 
   Map<String, String> _headers() {
     return {
       'Content-Type': 'application/json',
-      if (token != null && token!.isNotEmpty) 'Authorization': 'Bearer $token',
+      if (token != null) 'Authorization': 'Bearer $token',
     };
   }
 
@@ -459,50 +457,6 @@ class ApiService {
     }
   }
 
-  Future<bool> updateProfile({
-    required String name,
-    required String email,
-  }) async {
-    await _loadToken();
-    final response = await http.put(
-      Uri.parse('$baseUrl/profile'),
-      headers: _headers(),
-      body: json.encode({
-        'name': name,
-        'email': email,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      throw Exception('Gagal mengupdate profil: ${response.body}');
-    }
-  }
-
-  Future<bool> changePassword({
-    required String currentPassword,
-    required String newPassword,
-    required String confirmPassword,
-  }) async {
-    await _loadToken();
-    final response = await http.post(
-      Uri.parse('$baseUrl/change-password'),
-      headers: _headers(),
-      body: json.encode({
-        'current_password': currentPassword,
-        'new_password': newPassword,
-        'new_password_confirmation': confirmPassword,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      throw Exception('Gagal mengganti password: ${response.body}');
-    }
-  }
-
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -564,102 +518,198 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> updateMember({
-    required int memberId,
-    required String name,
-    required String phone,
-    required String address,
-    String? password,
-    String? avatarPath, // local file path
-  }) async {
+  Future<Member> updateProfile(Member member, {String? newPassword}) async {
+    await _loadToken();
+    
+    // Debug log to verify we're using the correct numeric ID
+    debugPrint('Updating profile for ID: ${member.id}');
+
+    final uri = Uri.parse('$baseUrl/update/profile/${member.id}');
+    final request = http.MultipartRequest('POST', uri)
+      ..fields['name'] = member.name
+      ..fields['email'] = member.email
+      ..fields['phone'] = member.phone
+      ..fields['address'] = member.address
+      ..fields['_method'] = 'PUT';
+
+    // Handle avatar upload - platform independent
+    if (member.avatar.isNotEmpty && !member.avatar.startsWith('http')) {
+      if (kIsWeb) {
+        // For web - send as base64 encoded string
+        try {
+          final bytes = await http.readBytes(Uri.parse(member.avatar));
+          final base64Image = base64Encode(bytes);
+          request.fields['avatar'] = base64Image;
+        } catch (e) {
+          debugPrint('Error encoding avatar: $e');
+          request.fields['avatar'] = member.avatar;
+        }
+      } else {
+        // For mobile/desktop
+        try {
+          final file = File(member.avatar);
+          if (await file.exists()) {
+            request.files.add(await http.MultipartFile.fromPath(
+              'avatar',
+              member.avatar,
+              filename: member.avatar.split('/').last,
+            ));
+          }
+        } catch (e) {
+          debugPrint('Error uploading avatar file: $e');
+          request.fields['avatar'] = member.avatar;
+        }
+      }
+    }
+
+    // Add password update if provided
+    if (newPassword != null && newPassword.isNotEmpty) {
+      request.fields['new_password'] = newPassword;
+      request.fields['password_confirmation'] = newPassword;
+    }
+
+    request.headers.addAll({
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+    });
+
+    try {
+      final response = await _sendRequest(request);
+      debugPrint('Profile update response: ${response.toString()}');
+
+      // Handle API response
+      if (response.containsKey('data')) {
+        if (response['data'] is Map) {
+          return Member.fromJson(response['data']);
+        }
+        // If data is not a Map, return updated member with current data
+        return member.copyWith(updatedAt: DateTime.now());
+      }
+      return Member.fromJson(response);
+    } catch (e) {
+      debugPrint('Error updating profile: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> updatePassword(int memberId, String currentPassword, String newPassword) async {
+    await _loadToken();
+    
+    // Basic validation
+    if (newPassword.length < 8) {
+      throw Exception('Password must be at least 8 characters');
+    }
+
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/update/password/$memberId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode({
+          'current_password': currentPassword,
+          'new_password': newPassword,
+          'password_confirmation': newPassword,
+        }),
+      );
+
+      final responseData = json.decode(response.body);
+      
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        throw Exception(
+          responseData['message'] ?? 
+          'Failed to update password (Status: ${response.statusCode})'
+        );
+      }
+    } catch (e) {
+      debugPrint('Error in updatePassword: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendRequest(http.MultipartRequest request) async {
+    try {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      final responseData = json.decode(response.body);
+
+      debugPrint('API Response: ${response.statusCode}');
+      debugPrint('Response Body: $responseData');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (responseData is Map) {
+          return responseData as Map<String, dynamic>;
+        }
+        return {'status': 'success', 'data': responseData};
+      } else {
+        throw ApiException(
+          message: responseData['message'] ?? 'Request failed',
+          statusCode: response.statusCode,
+          errors: responseData['errors'],
+        );
+      }
+    } on SocketException {
+      throw Exception('No Internet connection');
+    } on FormatException {
+      throw Exception('Invalid server response format');
+    } catch (e) {
+      throw Exception('Request failed: ${e.toString()}');
+    }
+  }
+
+  Future<bool> deleteHistory() async {
+    await _loadToken();
     final prefs = await SharedPreferences.getInstance();
-    token ??= prefs.getString('token');
-
-    var uri = Uri.parse('$baseUrl/members/$memberId');
-    var request = http.MultipartRequest('POST', uri)
-      ..fields['name'] = name
-      ..fields['phone'] = phone
-      ..fields['address'] = address
-      ..fields['_method'] = 'PUT'; // Laravel resource update via POST
-
-    if (password != null && password.isNotEmpty) {
-      request.fields['password'] = password;
+    final memberId = prefs.getString('member_id');
+    
+    if (memberId == null) {
+      throw Exception('Member ID not found');
     }
 
-    if (avatarPath != null && avatarPath.isNotEmpty) {
-      request.files.add(await http.MultipartFile.fromPath('avatar', avatarPath));
-    }
+    final response = await http.post(
+      Uri.parse('$baseUrl/clearReturned'),
+      headers: _headers(),
+      body: jsonEncode({'member_id': memberId}),
+    );
 
-    request.headers['Authorization'] = 'Bearer $token';
-    request.headers['Accept'] = 'application/json';
+    return response.statusCode == 200;
+  }
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
+  Future<Map<String, dynamic>> reportLostBook(int bookId, int memberId) async {
+    await _loadToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/bookMissing/$bookId'),
+      headers: _headers(),
+      body: jsonEncode({'member_id': memberId}),
+    );
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      throw Exception(json.decode(response.body)['message'] ?? 'Gagal update profil');
-    }
-  }
-
-    Future<bool> deleteHistory() async {
-    await _loadToken();
-    final url = Uri.parse('$baseUrl/clearReturned');
-    final token = await getStoredToken();
-    final prefs = await SharedPreferences.getInstance();
-    final memberId = prefs.getString('member_id');
-    
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token', 
-      },
-      body: jsonEncode({
-        'member_id': memberId,
-      }),
-    );
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  Future<Map<String, dynamic>> reportLostBook(int bookId, int memberId) async {
-    final url = Uri.parse('$baseUrl/bookMissing/$bookId');
-    final token = await getStoredToken(); // gunakan getStoredToken() yang sudah ada
-
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token', // jika perlu
-      },
-      body: jsonEncode({
-        'member_id': memberId,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Gagal melaporkan buku hilang');
+      throw Exception(
+        json.decode(response.body)['message'] ?? 'Failed to report lost book'
+      );
     }
   }
 
   Future<bool> logout() async {
-    await _loadToken();
-    final response = await http.post(
-      Uri.parse('$baseUrl/logout'),
-      headers: _headers(),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/logout'),
+        headers: _headers(),
+      );
 
-    if (response.statusCode == 200) {
-      await clearToken();
-      return true;
-    } else {
+      if (response.statusCode == 200) {
+        await clearToken();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error during logout: $e');
       return false;
     }
   }
