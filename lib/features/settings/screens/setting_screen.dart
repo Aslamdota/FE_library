@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:library_frontend/models/member.dart'; // Import your Member model
 import '../../auth/screens/edit_profile_screen.dart';
+import '../../../widgets/member_avatar.dart'; // Import your MemberAvatar widget
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -179,22 +180,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         child: ClipOval(
-                          child: (_member!.avatar.isNotEmpty)
-                              ? Image.network(
-                                  'http://localhost:8000/storage/${_member!.avatar}',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Image.asset(
-                                      'assets/images/profile_placeholder.png',
-                                      fit: BoxFit.cover,
-                                    );
-                                  },
-                                )
-                              : Image.asset(
-                                  'assets/images/profile_placeholder.png',
-                                  fit: BoxFit.cover,
-                                ),
-                        ),
+                          child: MemberAvatar(
+                            photoUrl: _member?.avatar,
+                            size: 120,
+                            borderRadius: BorderRadius.circular(60), // bulat penuh
+                          ),
+                        )
                       ),
                       Container(
                         padding: const EdgeInsets.all(6),

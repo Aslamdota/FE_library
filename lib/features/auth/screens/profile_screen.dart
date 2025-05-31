@@ -4,6 +4,7 @@ import '../../settings/screens/setting_screen.dart';
 import '../../settings/screens/notification_screen.dart';
 import '../../loans/screens/denda_screen.dart';
 import '../../settings/screens/history_screen.dart';
+import 'package:library_frontend/widgets/member_avatar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -52,9 +53,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final imageProvider = (photoUrl != null && photoUrl!.isNotEmpty)
-        ? NetworkImage('http://localhost:8000/storage/members/$photoUrl')
-        : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profil Saya')),
@@ -62,31 +60,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(24.0),
         children: [
           Center(
-            child: Column(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(100),
-                  child: Image(
-                    image: imageProvider,
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.asset(
-                        'assets/images/profile_placeholder.png',
-                        width: 100,
-                        height: 100,
-                        fit: BoxFit.cover,
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  userName,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ],
+            child: MemberAvatar(
+              photoUrl: photoUrl,
+              size: 120,
+              borderRadius: BorderRadius.circular(60), // bulat penuh
             ),
           ),
           const SizedBox(height: 24),

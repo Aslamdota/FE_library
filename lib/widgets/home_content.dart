@@ -68,26 +68,25 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
     );
   }
 
-  Widget _buildGreeting(BuildContext context, Color textColor, Color secondaryTextColor) {
+    Widget _buildGreeting(BuildContext context, Color textColor, Color secondaryTextColor) {
     return Row(
       children: [
         Hero(
-          tag: 'profile-avatar',
-          child: ClipOval(
-            child: (photoUrl != null && photoUrl!.isNotEmpty)
-                ? Image.network(
-                    'http://localhost:8000/storage/$photoUrl',
-                    width: _avatarRadius * 2,
-                    height: _avatarRadius * 2,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) setState(() => photoUrl = '');
-                      });
-                      return _buildPlaceholderAvatar(context);
-                    },
-                  )
-                : _buildPlaceholderAvatar(context),
+          tag: 'member-avatar-$memberName',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8), // Sama seperti cover buku
+            child: Container(
+              width: 60,
+              height: 60,
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              child: (photoUrl != null && photoUrl!.isNotEmpty)
+                  ? Image.network(
+                      _getAvatarUrl(photoUrl!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildPlaceholderAvatar(context),
+                    )
+                  : _buildPlaceholderAvatar(context),
+            ),
           ),
         ),
         const SizedBox(width: 16),
@@ -116,6 +115,14 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
         ),
       ],
     );
+  }
+  
+  // Tambahkan fungsi ini di bawah _getCoverUrl:
+  String _getAvatarUrl(String avatar) {
+    if (avatar.isEmpty) return '';
+    return avatar.startsWith('http')
+        ? avatar
+        : 'http://localhost:8000/storage/${avatar.replaceFirst(RegExp(r'^/'), '')}';
   }
 
   Widget _buildPlaceholderAvatar(BuildContext context) {

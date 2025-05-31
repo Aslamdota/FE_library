@@ -468,7 +468,7 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
-
+  
       if (kDebugMode) {
         print('Request payload: ${jsonEncode({
               'email': email,
@@ -476,22 +476,22 @@ class ApiService {
             })}');
         print('Raw API response: ${response.body}');
       }
-
+  
       final responseData = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
+  
+      if (response.statusCode == 200 && responseData['access_token'] != null) {
         final token = responseData['access_token'];
         final user = responseData['user'];
-        final memberName = user['name'];
-        final memberId = user['member_id'];
-
+        final memberName = user?['name'] ?? '';
+        final memberId = user?['member_id']?.toString() ?? '';
+  
         if (token != null && token.isNotEmpty) {
           await setToken(token);
-
+  
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('name', memberName ?? ''); // Ganti dari 'member_name' ke 'name'
-          await prefs.setString('member_id', memberId.toString());
-          await prefs.setString('avatar', (user['avatar'] ?? '').toString());
+          await prefs.setString('name', memberName);
+          await prefs.setString('member_id', memberId);
+          await prefs.setString('avatar', (user?['avatar'] ?? '').toString());
           return {
             'success': true,
             'message': responseData['message'] ?? 'Login sukses',
