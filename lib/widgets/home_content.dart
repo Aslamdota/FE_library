@@ -12,18 +12,20 @@ class ModernHomeContent extends StatefulWidget {
 
 class _ModernHomeContentState extends State<ModernHomeContent> {
   final ApiService apiService = ApiService();
-  late Future<List<dynamic>> _recommendationFuture;
   late Future<Map<String, dynamic>> _statsFuture;
+  late Future<List<dynamic>> _booksByCategoryFuture;
   String memberName = 'Member';
   String? photoUrl;
   final double _avatarRadius = 28.0;
+  List<dynamic> _categories = [];
+  int? _selectedCategoryId;
 
   @override
   void initState() {
     super.initState();
-    _recommendationFuture = apiService.getLatestBooks();
     _statsFuture = apiService.getStats();
     _loadUserData();
+    _loadCategories();
   }
 
   Future<void> _loadUserData() async {
@@ -39,11 +41,24 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
     }
   }
 
+  Future<void> _loadCategories() async {
+    final categories = await apiService.getCategories();
+    if (mounted) {
+      setState(() {
+        _categories = categories;
+        if (_categories.isNotEmpty) {
+          _selectedCategoryId = _categories[0]['id'];
+          _booksByCategoryFuture = apiService.getBooksByCategory(_selectedCategoryId!);
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
-    final cardColor = isDarkMode ? theme.colorScheme.surface : const Color(0xFFE3F0FF); // biru langit
+    final cardColor = isDarkMode ? theme.colorScheme.surface : const Color(0xFFE3F0FF);
     final textColor = isDarkMode ? theme.colorScheme.onBackground : Colors.black87;
     final secondaryTextColor = isDarkMode
         ? theme.colorScheme.onBackground.withOpacity(0.7)
@@ -60,21 +75,25 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
           const SizedBox(height: 16),
           _buildStatisticsCard(cardColor, textColor, secondaryTextColor),
           const SizedBox(height: 32),
-          _buildRecommendationHeader(context, textColor),
+          _buildCategoryHeader(context, textColor),
+          const SizedBox(height: 12),
+          if (_categories.isNotEmpty)
+            _buildCategorySelector(textColor, secondaryTextColor),
           const SizedBox(height: 16),
-          _buildRecommendationList(cardColor, textColor, secondaryTextColor),
+          if (_selectedCategoryId != null)
+            _buildBooksByCategoryList(cardColor, textColor, secondaryTextColor),
         ],
       ).animate().fadeIn().slideY(begin: 0.1, curve: Curves.easeOut),
     );
   }
 
-    Widget _buildGreeting(BuildContext context, Color textColor, Color secondaryTextColor) {
+  Widget _buildGreeting(BuildContext context, Color textColor, Color secondaryTextColor) {
     return Row(
       children: [
         Hero(
           tag: 'member-avatar-$memberName',
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(8), // Sama seperti cover buku
+            borderRadius: BorderRadius.circular(8),
             child: Container(
               width: 60,
               height: 60,
@@ -116,8 +135,7 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
       ],
     );
   }
-  
-  // Tambahkan fungsi ini di bawah _getCoverUrl:
+
   String _getAvatarUrl(String avatar) {
     if (avatar.isEmpty) return '';
     return avatar.startsWith('http')
@@ -234,9 +252,9 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
     );
   }
 
-  Widget _buildRecommendationHeader(BuildContext context, Color textColor) {
+  Widget _buildCategoryHeader(BuildContext context, Color textColor) {
     return Text(
-      '📚 Rekomendasi Buku',
+      '📚 Buku Berdasarkan Kategori',
       style: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.bold,
@@ -245,31 +263,65 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
     ).animate().fadeIn(delay: 600.ms).slideX(begin: 0.1);
   }
 
-  Widget _buildRecommendationList(Color cardColor, Color textColor, Color secondaryTextColor) {
+  Widget _buildCategorySelector(Color textColor, Color secondaryTextColor) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final category = _categories[index];
+          final isSelected = category['id'] == _selectedCategoryId;
+          return ChoiceChip(
+            label: Text(category['name'] ?? '-'),
+            selected: isSelected,
+            onSelected: (_) {
+              setState(() {
+                _selectedCategoryId = category['id'];
+                _booksByCategoryFuture = apiService.getBooksByCategory(_selectedCategoryId!);
+              });
+            },
+            selectedColor: Theme.of(context).colorScheme.primary,
+            labelStyle: TextStyle(
+              color: isSelected ? Colors.white : textColor,
+              fontWeight: FontWeight.bold,
+            ),
+            backgroundColor: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.grey[200],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBooksByCategoryList(Color cardColor, Color textColor, Color secondaryTextColor) {
+    if (_selectedCategoryId == null) {
+      return const SizedBox();
+    }
     return FutureBuilder<List<dynamic>>(
-      future: _recommendationFuture,
+      future: _booksByCategoryFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildLoadingList(cardColor, textColor);
         }
-
         if (snapshot.hasError) {
-          return _buildErrorCard('Gagal memuat rekomendasi buku', cardColor, textColor);
+          return _buildErrorCard('Gagal memuat buku', cardColor, textColor);
         }
-
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return _buildEmptyState(cardColor, textColor);
         }
-
         final books = snapshot.data!;
+        final filteredBooks = books.where((book) => book['category_id'] == _selectedCategoryId).toList();
         return Column(
-          children: books.take(5).map((book) {
+          children: filteredBooks.take(5).map((book) {
             return _buildBookCard(
               book,
               cardColor,
               textColor,
               secondaryTextColor,
-            ).animate().fadeIn(delay: (700 + (books.indexOf(book) * 100)).ms);
+            ).animate().fadeIn(delay: (700 + (filteredBooks.indexOf(book) * 100)).ms);
           }).toList(),
         );
       },
@@ -361,8 +413,8 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
   String _getCoverUrl(dynamic cover) {
     if (cover == null) return '';
     final coverStr = cover.toString();
-    return coverStr.startsWith('http') 
-        ? coverStr 
+    return coverStr.startsWith('http')
+        ? coverStr
         : 'http://localhost:8000/storage/${coverStr.replaceFirst(RegExp(r'^/'), '')}';
   }
 
@@ -520,7 +572,7 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Tidak ada rekomendasi buku',
+              'Tidak ada buku pada kategori ini',
               style: TextStyle(
                 color: textColor.withOpacity(0.5),
               ),

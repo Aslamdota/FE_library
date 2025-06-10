@@ -109,11 +109,25 @@ class ApiService {
   }
 
   Future<List<dynamic>> getBooksByCategory(int categoryId) async {
-    final response = await http.get(Uri.parse('$baseUrl/books?category_id=$categoryId'));
+    await _loadToken();
+    final url = Uri.parse('$baseUrl/books?category_id=$categoryId');
+    final response = await http.get(url, headers: _headers());
+  
+    if (kDebugMode) {
+      print('Request URL: $url');
+      print('Request Headers: ${_headers()}');
+      print('Raw API response: ${response.body}');
+    }
+  
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final data = json.decode(response.body);
+      if (data['status'] == 'success') {
+        return data['data']?['data'] ?? [];
+      } else {
+        throw Exception('API Error: ${data['message']}');
+      }
     } else {
-      throw Exception('Failed to load books');
+      throw Exception('Failed to load books: ${response.body}');
     }
   }
 
@@ -704,7 +718,7 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        await clearToken();
+        await clearToken(); // Hapus token dari local storage
         return true;
       }
       return false;
