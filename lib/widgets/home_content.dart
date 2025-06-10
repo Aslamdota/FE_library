@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../features/books/widgets/book_detail_sheet.dart';
+import '../models/book.dart'; 
 
 class ModernHomeContent extends StatefulWidget {
   const ModernHomeContent({super.key});
@@ -265,31 +267,58 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
 
   Widget _buildCategorySelector(Color textColor, Color secondaryTextColor) {
     return SizedBox(
-      height: 44,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           final category = _categories[index];
           final isSelected = category['id'] == _selectedCategoryId;
-          return ChoiceChip(
-            label: Text(category['name'] ?? '-'),
-            selected: isSelected,
-            onSelected: (_) {
-              setState(() {
-                _selectedCategoryId = category['id'];
-                _booksByCategoryFuture = apiService.getBooksByCategory(_selectedCategoryId!);
-              });
-            },
-            selectedColor: Theme.of(context).colorScheme.primary,
-            labelStyle: TextStyle(
-              color: isSelected ? Colors.white : textColor,
-              fontWeight: FontWeight.bold,
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      )
+                    ]
+                  : [],
+              border: Border.all(
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey[300]!,
+                width: 1.5,
+              ),
             ),
-            backgroundColor: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : Colors.grey[200],
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: () {
+                setState(() {
+                  _selectedCategoryId = category['id'];
+                  _booksByCategoryFuture = apiService.getBooksByCategory(_selectedCategoryId!);
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                child: Text(
+                  category['name'] ?? '-',
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : textColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
           );
         },
       ),
@@ -307,10 +336,23 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
           return _buildLoadingList(cardColor, textColor);
         }
         if (snapshot.hasError) {
-          return _buildErrorCard('Gagal memuat buku', cardColor, textColor);
+          return _buildErrorCard(
+            'Gagal memuat buku',
+            cardColor,
+            textColor,
+            onRetry: () {
+              setState(() {
+                _booksByCategoryFuture = apiService.getBooksByCategory(_selectedCategoryId!);
+              });
+            },
+          );
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return _buildEmptyState(cardColor, textColor);
+          return _buildEmptyState(cardColor, textColor, onRefresh: () {
+            setState(() {
+              _booksByCategoryFuture = apiService.getBooksByCategory(_selectedCategoryId!);
+            });
+          });
         }
         final books = snapshot.data!;
         final filteredBooks = books.where((book) => book['category_id'] == _selectedCategoryId).toList();
@@ -338,13 +380,29 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
       color: cardColor,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
-      elevation: 0,
+      elevation: 2,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         onTap: () {
-          // Navigate to book detail
+          // Konversi Map ke Book jika perlu
+          final bookObj = Book.fromJson(book);
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) {
+              return BookDetailSheet(
+                book: bookObj,
+                scrollController: ScrollController(),
+                memberId: null, // atau isi dengan memberId jika sudah login
+                onBorrow: () {
+                  // aksi pinjam buku
+                },
+              );
+            },
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -355,8 +413,8 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
                 child: Container(
                   width: 60,
                   height: 80,
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  child: book['cover'] != null
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                  child: book['cover'] != null && book['cover'].toString().isNotEmpty
                       ? Image.network(
                           _getCoverUrl(book['cover']),
                           fit: BoxFit.cover,
@@ -368,8 +426,9 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
                           },
                         )
                       : Icon(
-                          Icons.menu_book,
+                          Icons.menu_book_rounded,
                           color: Theme.of(context).colorScheme.primary,
+                          size: 32,
                         ),
                 ),
               ),
@@ -395,6 +454,17 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
                         fontSize: 14,
                         color: secondaryTextColor,
                       ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.category, size: 14, color: secondaryTextColor.withOpacity(0.7)),
+                        const SizedBox(width: 4),
+                        Text(
+                          book['category']?['name'] ?? '-',
+                          style: TextStyle(fontSize: 12, color: secondaryTextColor.withOpacity(0.7)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -531,7 +601,7 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
     );
   }
 
-  Widget _buildErrorCard(String message, Color cardColor, Color textColor) {
+  Widget _buildErrorCard(String message, Color cardColor, Color textColor, {VoidCallback? onRetry}) {
     return Card(
       color: cardColor,
       elevation: 0,
@@ -544,17 +614,25 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
           children: [
             Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
             const SizedBox(width: 12),
-            Text(
-              message,
-              style: TextStyle(color: textColor),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(color: textColor),
+              ),
             ),
+            if (onRetry != null)
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: onRetry,
+                tooltip: 'Coba Lagi',
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState(Color cardColor, Color textColor) {
+  Widget _buildEmptyState(Color cardColor, Color textColor, {VoidCallback? onRefresh}) {
     return Card(
       color: cardColor,
       elevation: 0,
@@ -577,6 +655,21 @@ class _ModernHomeContentState extends State<ModernHomeContent> {
                 color: textColor.withOpacity(0.5),
               ),
             ),
+            if (onRefresh != null) ...[
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Muat Ulang'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ]
           ],
         ),
       ),

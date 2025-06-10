@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/api_service.dart';
 import '../../../models/book.dart';
+import '../widgets/book_detail_sheet.dart';
 
 class BookListScreen extends StatefulWidget {
   final int? categoryId;
@@ -341,30 +342,14 @@ class _BookListScreenState extends State<BookListScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.only(top: 12),
-          child: DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.7,
-            minChildSize: 0.5,
-            maxChildSize: 0.9,
-            builder: (context, scrollController) {
-              return _BookDetailsSheet(
-                book: book,
-                scrollController: scrollController,
-                memberId: _memberId,
-                onBorrow: () => _handleBookLoan(context, book),
-              );
-            },
-          ),
+        return BookDetailSheet(
+          book: book,
+          scrollController: ScrollController(),
+          memberId: _memberId,
+          onBorrow: () => _handleBookLoan(context, book),
         );
       },
     ).then((_) {
-      // Trigger rebuild when sheet is closed
       if (mounted) setState(() {});
     });
   }
@@ -449,7 +434,7 @@ class _BookCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                 child: AspectRatio(
-                  aspectRatio: 1.0, // <--- Ubah dari 0.7 ke 1.0 agar cover lebih kecil
+                  aspectRatio: 1.0,
                   child: book.coverUrl != null
                       ? Image.network(
                           book.coverUrl!,
@@ -512,8 +497,8 @@ class _BookCard extends StatelessWidget {
             ),
           ],
         ),
-      )
-    ); 
+      ),
+    );
   }
 
   Widget _buildPlaceholderCover(ColorScheme colorScheme) {
@@ -525,221 +510,6 @@ class _BookCard extends StatelessWidget {
           size: 40,
           color: colorScheme.onSurfaceVariant,
         ),
-      ),
-    );
-  }
-}
-
-class _BookDetailsSheet extends StatelessWidget {
-  final Book book;
-  final ScrollController scrollController;
-  final String? memberId;
-  final VoidCallback onBorrow;
-
-  const _BookDetailsSheet({
-    required this.book,
-    required this.scrollController,
-    required this.memberId,
-    required this.onBorrow,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final mediaQuery = MediaQuery.of(context);
-
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: mediaQuery.size.height * 0.9,
-      ),
-      child: SingleChildScrollView(
-        controller: scrollController,
-        physics: const ClampingScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: colorScheme.onSurface.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Book header
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Book cover - Hero animation
-                Hero(
-                  tag: 'book-cover-${book.id}',
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: 100,
-                      maxHeight: 150,
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        color: colorScheme.surfaceVariant,
-                        child: book.coverUrl != null
-                            ? Image.network(
-                                book.coverUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => _buildPlaceholderCover(colorScheme),
-                              )
-                            : _buildPlaceholderCover(colorScheme),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-
-                // Title and author
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        book.title,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        book.author,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: colorScheme.primary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Divider
-            Divider(color: colorScheme.outline.withOpacity(0.2)),
-            const SizedBox(height: 16),
-
-            // Book details
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _DetailRow(label: 'Penerbit', value: book.publisher ?? '-', colorScheme: colorScheme),
-                _DetailRow(label: 'ISBN', value: book.isbn ?? '-', colorScheme: colorScheme),
-                _DetailRow(
-                  label: 'Tahun Terbit',
-                  value: book.publicationYear?.toString() ?? '-',
-                  colorScheme: colorScheme,
-                ),
-                _DetailRow(
-                  label: 'Kategori',
-                  value: book.category?['name']?.toString() ?? '-',
-                  colorScheme: colorScheme,
-                ),
-                _DetailRow(
-                  label: 'Stok Tersedia',
-                  value: book.stock?.toString() ?? '0',
-                  colorScheme: colorScheme,
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-
-            // Borrow button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: memberId == null ? null : onBorrow,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  elevation: 2,
-                ),
-                child: memberId == null
-                    ? const Text('Login untuk Meminjam')
-                    : const Text('Pinjam Buku'),
-              ),
-            ),
-            
-            // Extra padding for bottom inset
-            SizedBox(height: mediaQuery.viewInsets.bottom),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholderCover(ColorScheme colorScheme) {
-    return Center(
-      child: Icon(
-        Icons.menu_book_rounded,
-        size: 40,
-        color: colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final ColorScheme colorScheme;
-
-  const _DetailRow({
-    required this.label,
-    required this.value,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: colorScheme.onSurface.withOpacity(0.8),
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-            ),
-          ),
-        ],
       ),
     );
   }
