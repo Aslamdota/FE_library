@@ -46,12 +46,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         );
       } else {
         setState(() {
-          _error = data['message'] ?? 'Terjadi kesalahan';
+          _error = data['message'] ?? 'Terjadi kesalahan (${response.statusCode})';
         });
       }
     } catch (e) {
       setState(() {
-        _error = 'Gagal mengirim permintaan. Cek koneksi Anda.';
+        _error = 'Gagal mengirim permintaan. Cek koneksi Anda. ($e)';
       });
     }
     setState(() => _loading = false);
